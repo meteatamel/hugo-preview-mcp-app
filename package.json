@@ -1,0 +1,25 @@
+{
+  "name": "hugo-mcp-app",
+  "version": "0.1.0",
+  "description": "Antigravity MCP App to start/stop Hugo and preview blog posts in the side panel",
+  "type": "module",
+  "scripts": {
+    "build:ui": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build": "npm run build:ui && npm run build:server",
+    "dev:ui": "vite build --watch",
+    "start": "node dist/server/index.js",
+    "install-plugin": "bash scripts/install-plugin.sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}

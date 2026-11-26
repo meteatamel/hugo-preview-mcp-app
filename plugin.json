@@ -1,0 +1,12 @@
+{
+  "name": "hugo-preview",
+  "displayName": "Hugo Preview",
+  "version": "0.1.0",
+  "description": "Start and stop a local Hugo server and preview blog posts live in Antigravity's side panel.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Open Hugo Preview and start my blog server",
+    "Preview my latest draft or scheduled post in the side panel",
+    "Stop the local Hugo server"
+  ]
+}

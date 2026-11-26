@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "hugo-preview": {
+      "command": "bash",
+      "args": [
+        "${PLUGIN_ROOT}/bin/hugo-mcp-server",
+        "--data-dir=${PLUGIN_DATA}",
+        "--default-site=/Users/atamel/dev/github/meteatamel/atamel.dev"
+      ]
+    }
+  }
+}

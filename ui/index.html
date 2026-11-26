@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hugo Preview</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <!-- Top Control Bar -->
+    <header class="toolbar">
+      <div class="toolbar-row">
+        <button id="btn-start-stop" class="btn btn-primary" type="button">Start</button>
+        <span id="status-badge" class="status-badge stopped" title="Hugo server status">
+          <span class="status-dot"></span>
+          <span id="status-label">Connecting...</span>
+        </span>
+        <button id="btn-reload" class="btn hidden" type="button" title="Reload preview iframe">↻</button>
+
+        <label class="flag-toggle" title="Include draft posts (--buildDrafts)">
+          <input id="chk-drafts" type="checkbox" checked />
+          <span>-D</span>
+        </label>
+        <label class="flag-toggle" title="Include future-dated posts (--buildFuture)">
+          <input id="chk-future" type="checkbox" checked />
+          <span>-F</span>
+        </label>
+
+        <div class="spacer"></div>
+
+        <button id="btn-mobile" class="btn hidden" type="button" title="Toggle mobile width preview">📱</button>
+        <button id="btn-open-browser" class="btn hidden" type="button" title="Open in external browser">↗</button>
+        <button id="btn-logs" class="btn" type="button" title="Toggle build logs">Logs</button>
+        <button id="btn-settings" class="btn" type="button" title="Site & port settings">⚙</button>
+      </div>
+
+      <!-- Post View Bar (shown when viewing a post) -->
+      <div id="running-bar" class="toolbar-row picker-row hidden">
+        <button id="btn-back-posts" class="btn" type="button" title="Back to posts list">← Posts</button>
+        <select id="post-select" class="post-select" aria-label="Select a blog post"></select>
+        <button id="btn-refresh-posts" class="btn" type="button" title="Refresh post list">⟳</button>
+        <div class="segmented" role="group" aria-label="View mode">
+          <button id="btn-mode-preview" class="seg-btn active" type="button" title="Live preview only">Preview</button>
+          <button id="btn-mode-split" class="seg-btn" type="button" title="Markdown editor + live preview">Split</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Collapsible Settings Panel -->
+    <section id="settings-panel" class="drawer hidden">
+      <div class="settings-grid">
+        <label class="field">
+          <span>Hugo Site Directory</span>
+          <input id="input-site-dir" type="text" placeholder="/path/to/hugo-site" />
+        </label>
+        <label class="field port-field">
+          <span>Port</span>
+          <input id="input-port" type="number" min="1313" max="1320" value="1313" />
+        </label>
+        <div class="settings-actions">
+          <button id="btn-save-settings" class="btn btn-primary" type="button">Save &amp; Apply</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Error / Notice Banner -->
+    <div id="banner" class="banner hidden"></div>
+
+    <!-- Main Viewport -->
+    <main class="viewport">
+      <!-- Inline Markdown Editor -->
+      <section id="editor-pane" class="editor-pane hidden">
+        <div class="editor-header">
+          <span id="editor-filename" class="editor-filename">Select a post to edit</span>
+          <span id="editor-status" class="editor-status"></span>
+          <div class="spacer"></div>
+          <label class="flag-toggle" title="Automatically save 1s after you stop typing">
+            <input id="chk-autosave" type="checkbox" checked />
+            <span>Auto-save</span>
+          </label>
+          <button id="btn-save-md" class="btn btn-xs btn-primary" type="button" title="Save Markdown (Cmd/Ctrl+S)" disabled>Save</button>
+        </div>
+        <textarea id="md-editor" class="md-editor" spellcheck="true" placeholder="Select a post from the dropdown above to edit its Markdown..."></textarea>
+      </section>
+
+      <div id="iframe-wrap" class="iframe-wrap hidden">
+        <iframe id="preview-iframe" title="Hugo live preview" src="about:blank"></iframe>
+      </div>
+
+      <div id="empty-state" class="empty-state">
+        <div class="stopped-header">
+          <div id="empty-subtitle" class="empty-subtitle">Pick a post to start &amp; preview</div>
+          <div class="stopped-search-row">
+            <input id="post-filter" class="post-filter" type="text" placeholder="Filter posts..." aria-label="Filter posts" />
+            <button id="btn-refresh-stopped" class="btn" type="button" title="Refresh post list">⟳</button>
+          </div>
+        </div>
+        <div id="recent-posts" class="recent-posts"></div>
+      </div>
+    </main>
+
+    <!-- Collapsible Logs Drawer -->
+    <section id="logs-drawer" class="logs-drawer hidden">
+      <div class="logs-header">
+        <span>Hugo Server Logs</span>
+        <button id="btn-refresh-logs" class="btn btn-xs" type="button">Refresh</button>
+      </div>
+      <pre id="logs-output" class="logs-output">No logs yet.</pre>
+    </section>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
