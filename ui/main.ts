@@ -66,6 +66,7 @@ const state: {
   editorSaving: boolean;
   editorStatusText: string;
   autoSave: boolean;
+  splitPercent: number;
 } = {
   status: null,
   posts: [],
@@ -88,6 +89,7 @@ const state: {
   editorSaving: false,
   editorStatusText: "",
   autoSave: true,
+  splitPercent: 46,
 };
 
 const $ = <T extends HTMLElement>(id: string) =>
@@ -96,7 +98,9 @@ const $ = <T extends HTMLElement>(id: string) =>
 const statusBadge = $<HTMLSpanElement>("status-badge");
 const statusLabel = $<HTMLSpanElement>("status-label");
 const btnStartStop = $<HTMLButtonElement>("btn-start-stop");
-const btnReload = $<HTMLButtonElement>("btn-reload");
+const iconStart = $<SVGElement>("icon-start");
+const iconStop = $<SVGElement>("icon-stop");
+const labelStartStop = $<HTMLSpanElement>("label-start-stop");
 const chkDrafts = $<HTMLInputElement>("chk-drafts");
 const chkFuture = $<HTMLInputElement>("chk-future");
 const btnMobile = $<HTMLButtonElement>("btn-mobile");
@@ -106,7 +110,6 @@ const btnSettings = $<HTMLButtonElement>("btn-settings");
 const runningBar = $<HTMLDivElement>("running-bar");
 const btnBackPosts = $<HTMLButtonElement>("btn-back-posts");
 const postSelect = $<HTMLSelectElement>("post-select");
-const btnRefreshPosts = $<HTMLButtonElement>("btn-refresh-posts");
 const btnModePreview = $<HTMLButtonElement>("btn-mode-preview");
 const btnModeSplit = $<HTMLButtonElement>("btn-mode-split");
 const settingsPanel = $<HTMLElement>("settings-panel");
@@ -117,13 +120,16 @@ const banner = $<HTMLDivElement>("banner");
 const editorPane = $<HTMLElement>("editor-pane");
 const editorFilename = $<HTMLSpanElement>("editor-filename");
 const editorStatus = $<HTMLSpanElement>("editor-status");
-const chkAutosave = $<HTMLInputElement>("chk-autosave");
-const btnSaveMd = $<HTMLButtonElement>("btn-save-md");
 const mdEditor = $<HTMLTextAreaElement>("md-editor");
+const splitResizer = $<HTMLDivElement>("split-resizer");
+const viewportEl = document.querySelector<HTMLElement>(".viewport")!;
 const iframeWrap = $<HTMLDivElement>("iframe-wrap");
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let scrollSyncTimer: ReturnType<typeof setTimeout> | null = null;
+let scrollRaf: number | null = null;
+let editorScrollRaf: number | null = null;
+let ignoreEditorScrollUntil = 0;
 let lastSyncedHash: string | null = null;
 const previewIframe = $<HTMLIFrameElement>("preview-iframe");
 const emptyState = $<HTMLDivElement>("empty-state");
@@ -244,8 +250,51 @@ function syncPreviewToOffset(charOffset: number, force = false): void {
   previewIframe.src = `${baseUrl}${nextHash}`;
 }
 
+function getEditorScrollRatio(): number {
+  const maxScroll = mdEditor.scrollHeight - mdEditor.clientHeight;
+  if (maxScroll <= 0) return 0;
+  return Math.min(1, Math.max(0, mdEditor.scrollTop / maxScroll));
+}
+
+function postSmoothScroll(ratio: number, smooth: boolean): void {
+  if (state.viewMode !== "split" || !state.status?.running) return;
+  const targetOrigin = state.status.url || "*";
+  try {
+    previewIframe.contentWindow?.postMessage(
+      { type: "hugo-preview-scroll", ratio, smooth },
+      targetOrigin
+    );
+  } catch {
+    // Ignore if iframe not ready yet
+  }
+}
+
 function scheduleScrollSync(source: "cursor" | "scroll" = "cursor"): void {
   if (state.viewMode !== "split" || !state.status?.running) return;
+
+  // Managed Hugo runs behind our preview proxy, which supports pixel-smooth postMessage scrolling
+  if (state.status.managed) {
+    if (source === "scroll") {
+      if (scrollRaf === null) {
+        scrollRaf = requestAnimationFrame(() => {
+          scrollRaf = null;
+          postSmoothScroll(getEditorScrollRatio(), false);
+        });
+      }
+      return;
+    }
+
+    if (scrollSyncTimer) clearTimeout(scrollSyncTimer);
+    scrollSyncTimer = setTimeout(() => {
+      scrollSyncTimer = null;
+      const len = Math.max(1, mdEditor.value.length);
+      const cursorRatio = Math.min(1, Math.max(0, mdEditor.selectionStart / len));
+      postSmoothScroll(cursorRatio, true);
+    }, 120);
+    return;
+  }
+
+  // Fallback for unmanaged/external Hugo servers: heading-anchor fragment sync
   if (scrollSyncTimer) clearTimeout(scrollSyncTimer);
   scrollSyncTimer = setTimeout(() => {
     scrollSyncTimer = null;
@@ -254,9 +303,7 @@ function scheduleScrollSync(source: "cursor" | "scroll" = "cursor"): void {
         syncPreviewToOffset(0, false);
         return;
       }
-      const maxScroll = Math.max(1, mdEditor.scrollHeight - mdEditor.clientHeight);
-      const ratio = Math.min(1, Math.max(0, mdEditor.scrollTop / maxScroll));
-      const approxOffset = Math.floor(ratio * mdEditor.value.length);
+      const approxOffset = Math.floor(getEditorScrollRatio() * mdEditor.value.length);
       syncPreviewToOffset(approxOffset, false);
     } else {
       syncPreviewToOffset(mdEditor.selectionStart, false);
@@ -450,13 +497,15 @@ function render(): void {
   }
 
   btnStartStop.disabled = state.busy || (running && !managed);
-  btnStartStop.textContent = running ? "Stop" : "Start";
+  iconStart.classList.toggle("hidden", running);
+  iconStop.classList.toggle("hidden", !running);
+  labelStartStop.textContent = running ? "Stop" : "Start";
   btnStartStop.title =
     running && !managed
       ? "Hugo was started outside this app and cannot be stopped here"
       : running
-        ? "Stop Hugo server"
-        : "Start Hugo server";
+        ? "Stop the running local Hugo dev server"
+        : "Start the local Hugo dev server for this site";
 
   // If server is stopped (and not currently starting), return to the main posts list
   if (!running && !state.busy) {
@@ -468,8 +517,6 @@ function render(): void {
 
   // Show post-specific controls only when viewing a post
   runningBar.classList.toggle("hidden", !viewingPost);
-  btnReload.classList.toggle("hidden", !viewingPost);
-  btnReload.disabled = !viewingPost || state.busy;
   btnMobile.classList.toggle("hidden", !viewingPost);
   btnOpenBrowser.classList.toggle("hidden", !viewingPost || !state.canOpenLinks);
   btnOpenBrowser.disabled = !viewingPost || !state.canOpenLinks;
@@ -484,6 +531,10 @@ function render(): void {
   const showEditor = viewingPost && Boolean(activePost) && state.viewMode === "split";
 
   editorPane.classList.toggle("hidden", !showEditor);
+  splitResizer.classList.toggle("hidden", !showEditor);
+  if (showEditor) {
+    editorPane.style.flexBasis = `${state.splitPercent}%`;
+  }
   editorFilename.textContent = activePost
     ? activePost.relPath
     : "Select a post to edit";
@@ -493,8 +544,6 @@ function render(): void {
     : state.editorStatusText.startsWith("Saved")
       ? "editor-status saved"
       : "editor-status";
-  btnSaveMd.disabled = !state.editorFilePath || !state.editorDirty || state.editorSaving;
-  chkAutosave.checked = state.autoSave;
 
   chkDrafts.checked = state.config.buildDrafts;
   chkFuture.checked = state.config.buildFuture;
@@ -713,8 +762,6 @@ btnStartStop.onclick = () => {
   }
 };
 
-btnReload.onclick = () => loadIframe(true);
-
 const onFlagChange = async () => {
   state.config.buildDrafts = chkDrafts.checked;
   state.config.buildFuture = chkFuture.checked;
@@ -797,42 +844,93 @@ postSelect.onchange = () => {
   if (state.viewMode === "split") void loadEditorForActivePost(false);
 };
 
-btnRefreshPosts.onclick = () => void refreshPosts();
 btnRefreshStopped.onclick = () => void refreshPosts();
 postFilter.oninput = () => renderPosts();
 
 btnModePreview.onclick = () => void setViewMode("preview");
 btnModeSplit.onclick = () => void setViewMode("split");
 
-btnSaveMd.onclick = () => void saveEditor();
-chkAutosave.onchange = () => {
-  state.autoSave = chkAutosave.checked;
-  if (state.autoSave && state.editorDirty) {
-    void saveEditor();
-  }
-};
-
 mdEditor.oninput = () => {
   state.editorDirty = true;
   state.editorStatusText = "Unsaved";
-  btnSaveMd.disabled = !state.editorFilePath || state.editorSaving;
   editorStatus.textContent = state.editorStatusText;
   editorStatus.className = "editor-status dirty";
 
   scheduleScrollSync("cursor");
 
-  if (state.autoSave) {
-    if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(() => {
-      autoSaveTimer = null;
-      void saveEditor();
-    }, 1000);
-  }
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    autoSaveTimer = null;
+    void saveEditor();
+  }, 1000);
 };
 
 mdEditor.onclick = () => scheduleScrollSync("cursor");
 mdEditor.onkeyup = () => scheduleScrollSync("cursor");
-mdEditor.onscroll = () => scheduleScrollSync("scroll");
+mdEditor.onscroll = () => {
+  if (Date.now() < ignoreEditorScrollUntil) return;
+  scheduleScrollSync("scroll");
+};
+
+// Handle messages from the proxied Hugo preview iframe (ready + reverse scroll sync)
+window.addEventListener("message", (ev) => {
+  if (!ev.data || typeof ev.data !== "object" || state.viewMode !== "split") {
+    return;
+  }
+  if (ev.data.type === "hugo-preview-ready") {
+    postSmoothScroll(getEditorScrollRatio(), false);
+    return;
+  }
+  if (ev.data.type === "hugo-preview-scrolled") {
+    const ratio = Math.min(1, Math.max(0, Number(ev.data.ratio) || 0));
+    if (editorScrollRaf !== null) cancelAnimationFrame(editorScrollRaf);
+    editorScrollRaf = requestAnimationFrame(() => {
+      editorScrollRaf = null;
+      const maxScroll = Math.max(0, mdEditor.scrollHeight - mdEditor.clientHeight);
+      ignoreEditorScrollUntil = Date.now() + 180;
+      mdEditor.scrollTop = Math.round(ratio * maxScroll);
+    });
+  }
+});
+
+// Adjustable split divider (drag to resize, double-click to reset)
+let draggingSplit = false;
+
+splitResizer.addEventListener("pointerdown", (e) => {
+  draggingSplit = true;
+  splitResizer.setPointerCapture(e.pointerId);
+  splitResizer.classList.add("dragging");
+  iframeWrap.classList.add("resizing");
+  e.preventDefault();
+});
+
+splitResizer.addEventListener("pointermove", (e) => {
+  if (!draggingSplit) return;
+  const rect = viewportEl.getBoundingClientRect();
+  if (rect.height <= 0) return;
+  const pct = ((e.clientY - rect.top) / rect.height) * 100;
+  state.splitPercent = Math.min(82, Math.max(16, Math.round(pct * 10) / 10));
+  editorPane.style.flexBasis = `${state.splitPercent}%`;
+});
+
+const stopSplitDrag = (e: PointerEvent) => {
+  if (!draggingSplit) return;
+  draggingSplit = false;
+  try {
+    splitResizer.releasePointerCapture(e.pointerId);
+  } catch {
+    // ignore
+  }
+  splitResizer.classList.remove("dragging");
+  iframeWrap.classList.remove("resizing");
+};
+
+splitResizer.addEventListener("pointerup", stopSplitDrag);
+splitResizer.addEventListener("pointercancel", stopSplitDrag);
+splitResizer.addEventListener("dblclick", () => {
+  state.splitPercent = 46;
+  editorPane.style.flexBasis = `${state.splitPercent}%`;
+});
 
 mdEditor.onkeydown = (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {

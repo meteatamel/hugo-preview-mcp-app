@@ -1,5 +1,5 @@
 {
-  "name": "hugo-mcp-app",
+  "name": "hugo-preview-mcp-app",
   "version": "0.1.0",
   "description": "Antigravity MCP App to start/stop Hugo and preview blog posts in the side panel",
   "type": "module",

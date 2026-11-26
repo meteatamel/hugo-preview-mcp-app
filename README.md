@@ -9,21 +9,14 @@ An [Antigravity MCP App](https://antigravity.google/docs/mcp-apps/) plugin that 
 1. **One-Click Local Hugo Lifecycle**: Start and stop your local `hugo server` directly from Antigravity's side panel with `--buildDrafts` (`-D`) and `--buildFuture` (`-F`) enabled by default (and toggleable anytime). No separate terminal needed—and the server cleans up automatically on exit.
 2. **Browse Recent, Upcoming & Older Posts**: Open the panel to see your 10 most recent and scheduled posts (with `DRAFT` and `FUTURE` badges), filter across your entire blog in real time, or pick any older post from the **Older Posts** dropdown. Clicking any post starts Hugo automatically if it isn't running yet.
 3. **Live Post Preview (Desktop & Mobile)**: Inspect how your Hugo post renders in real time alongside your conversation, toggle a mobile viewport width (`📱`), pop the page out into your browser (`↗`), or inspect live Hugo build logs and errors (`Logs`).
-4. **Split-View Markdown Editing with Live Reload**: Switch to **Split** mode to edit a post's `.md` source on top while watching Hugo live-reload the rendered post underneath. Includes **Auto-save** (saves 1s after you stop typing), **`Cmd/Ctrl+S`** manual save, Tab indentation, and **heading-synced scrolling** so the preview follows the section you're editing.
+4. **Split-View Markdown Editing with Bidirectional Smooth Scroll & Live Reload**: Switch to **Split** mode to edit a post's `.md` source on top while watching Hugo live-reload the rendered post underneath. Drag the divider to adjust the split height (double-click to reset). Includes always-on **auto-save** (1s after you stop typing, or `Cmd/Ctrl+S` immediately), Tab indentation, and **bidirectional smooth scroll sync** (scrolling Markdown smoothly scrolls the preview and vice versa).
 5. **Agent-Driven Previews**: Ask your Antigravity agent to *"open Hugo Preview"*, *"list my draft or future posts"*, or *"preview my latest post"*—the agent can start Hugo and steer the side panel straight to a specific post while you edit together.
 
 ---
 
-## Screenshots
+## Demo
 
-### Main Page (Posts List & Older Posts Dropdown)
-<img src="assets/screenshots/main-posts.png" alt="Hugo Preview Main Page" width="460" />
-
-### Preview View (Live Hugo Post)
-<img src="assets/screenshots/preview-view.png" alt="Hugo Preview Post View" width="460" />
-
-### Split View (Markdown Editor + Live Preview)
-<img src="assets/screenshots/split-view.png" alt="Hugo Preview Split View" width="460" />
+<img src="assets/demo.gif" alt="Hugo Preview MCP App walkthrough showing posts list, live preview, and split Markdown editing with smooth scroll sync" width="520" />
 
 ---
 

@@ -136,6 +136,11 @@ body {
   font-size: 11px;
 }
 
+.btn-icon {
+  width: 26px;
+  padding: 0;
+}
+
 .flag-toggle {
   display: inline-flex;
   align-items: center;
@@ -448,16 +453,46 @@ body {
 }
 
 .editor-pane {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 46%;
+  min-height: 80px;
   display: flex;
   flex-direction: column;
   background: var(--color-background-primary, #ffffff);
-  border-bottom: 2px solid var(--color-border-primary, #d5d8de);
 }
 
-.editor-pane.solo {
-  border-bottom: none;
+.split-resizer {
+  height: 8px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  background: var(--color-background-secondary, #f6f7f9);
+  border-top: 1px solid var(--color-border-primary, #d5d8de);
+  border-bottom: 1px solid var(--color-border-primary, #d5d8de);
+  user-select: none;
+  touch-action: none;
+}
+
+.split-resizer:hover,
+.split-resizer.dragging {
+  background: var(--color-background-tertiary, #e4e7ec);
+}
+
+.split-resizer-grip {
+  width: 36px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-border-primary, #b8bec8);
+}
+
+.split-resizer:hover .split-resizer-grip,
+.split-resizer.dragging .split-resizer-grip {
+  background: var(--color-ring-primary, #1a73e8);
+}
+
+.iframe-wrap.resizing iframe {
+  pointer-events: none;
 }
 
 .editor-header {
@@ -477,7 +512,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 200px;
+  min-width: 0;
 }
 
 .editor-status {

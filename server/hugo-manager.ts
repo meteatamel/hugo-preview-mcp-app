@@ -1,5 +1,6 @@
 import { spawn, execFile, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
+import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -40,6 +41,50 @@ export interface StartOptions {
 }
 
 const MAX_LOG_LINES = 150;
+
+const SCROLL_SYNC_SCRIPT = `<script>(function(){
+  var raf=null,targetTop=null,targetBehavior='auto',ignoreUntil=0,outRaf=null;
+  window.addEventListener('message',function(ev){
+    var d=ev.data;
+    if(!d||d.type!=='hugo-preview-scroll')return;
+    var max=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
+    targetTop=Math.round(Math.min(1,Math.max(0,Number(d.ratio)||0))*max);
+    targetBehavior=d.smooth?'smooth':'auto';
+    ignoreUntil=Date.now()+(d.smooth?400:180);
+    if(!raf){
+      raf=requestAnimationFrame(function(){
+        raf=null;
+        if(targetTop!==null){
+          ignoreUntil=Date.now()+(targetBehavior==='smooth'?400:180);
+          window.scrollTo({top:targetTop,behavior:targetBehavior});
+        }
+      });
+    }
+  });
+  window.addEventListener('scroll',function(){
+    if(Date.now()<ignoreUntil)return;
+    if(!outRaf){
+      outRaf=requestAnimationFrame(function(){
+        outRaf=null;
+        if(Date.now()<ignoreUntil)return;
+        var max=Math.max(1,document.documentElement.scrollHeight-window.innerHeight);
+        var ratio=Math.min(1,Math.max(0,window.scrollY/max));
+        try{window.parent.postMessage({type:'hugo-preview-scrolled',ratio:ratio},'*');}catch(e){}
+      });
+    }
+  },{passive:true});
+  window.addEventListener('load',function(){
+    try{window.parent.postMessage({type:'hugo-preview-ready'},'*');}catch(e){}
+  });
+})();</script>`;
+
+function injectScrollScript(html: string): string {
+  const idx = html.lastIndexOf("</body>");
+  if (idx !== -1) {
+    return html.slice(0, idx) + SCROLL_SYNC_SCRIPT + html.slice(idx);
+  }
+  return html + SCROLL_SYNC_SCRIPT;
+}
 
 function resolveHugoBinary(): string {
   const candidates = [
@@ -128,6 +173,7 @@ function extractUrlPath(permalink: string): string {
 
 export class HugoManager {
   private child: ChildProcess | null = null;
+  private proxyServer: http.Server | null = null;
   private activeOpts: StartOptions;
   private startedAt: string | null = null;
   private lastError: string | null = null;
@@ -235,15 +281,18 @@ export class HugoManager {
       return this.getStatus(opts);
     }
 
+    const internalPort = opts.port + 1000;
     const args = [
       "server",
       "--port",
-      String(opts.port),
+      String(internalPort),
       "--bind",
       "127.0.0.1",
       "--baseURL",
       `http://localhost:${opts.port}/`,
       "--appendPort=false",
+      "--liveReloadPort",
+      String(opts.port),
     ];
     if (opts.buildDrafts) args.push("--buildDrafts");
     if (opts.buildFuture) args.push("--buildFuture");
@@ -300,6 +349,7 @@ export class HugoManager {
       if (this.child === child) {
         this.child = null;
         this.startedAt = null;
+        this.closeProxy();
       }
       if (readyReject) {
         readyReject(
@@ -316,13 +366,13 @@ export class HugoManager {
     // Race against a 10s startup timeout + port readiness poll.
     const timeout = setTimeout(async () => {
       if (readyResolve) {
-        if (await isPortOpen(opts.port)) {
+        if (await isPortOpen(internalPort)) {
           readyResolve();
         } else {
           readyReject?.(
             new Error(
               this.lastError ||
-                `Timed out waiting for Hugo server on port ${opts.port}`
+                `Timed out waiting for Hugo server on port ${internalPort}`
             )
           );
         }
@@ -333,6 +383,10 @@ export class HugoManager {
 
     try {
       await readyPromise;
+      await this.startProxy(opts.port, internalPort);
+    } catch (err) {
+      await this.stop();
+      throw err;
     } finally {
       clearTimeout(timeout);
     }
@@ -340,7 +394,104 @@ export class HugoManager {
     return this.getStatus(opts);
   }
 
+  private async startProxy(listenPort: number, targetPort: number): Promise<void> {
+    this.closeProxy();
+
+    const server = http.createServer((req, res) => {
+      const headers = { ...req.headers };
+      // Request uncompressed responses so we can inject the scroll-sync snippet into HTML
+      headers["accept-encoding"] = "identity";
+      headers.host = `127.0.0.1:${targetPort}`;
+
+      const proxyReq = http.request(
+        {
+          hostname: "127.0.0.1",
+          port: targetPort,
+          path: req.url || "/",
+          method: req.method,
+          headers,
+        },
+        (proxyRes) => {
+          const contentType = String(proxyRes.headers["content-type"] || "");
+          if (contentType.includes("text/html")) {
+            const chunks: Buffer[] = [];
+            proxyRes.on("data", (chunk: Buffer) => chunks.push(chunk));
+            proxyRes.on("end", () => {
+              const rawHtml = Buffer.concat(chunks).toString("utf8");
+              const injected = injectScrollScript(rawHtml);
+              const outBuf = Buffer.from(injected, "utf8");
+              const outHeaders = { ...proxyRes.headers };
+              delete outHeaders["content-encoding"];
+              outHeaders["content-length"] = String(outBuf.length);
+              res.writeHead(proxyRes.statusCode || 200, outHeaders);
+              res.end(outBuf);
+            });
+          } else {
+            res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+            proxyRes.pipe(res);
+          }
+        }
+      );
+
+      proxyReq.on("error", () => {
+        if (!res.headersSent) {
+          res.writeHead(502, { "Content-Type": "text/plain" });
+        }
+        res.end("Hugo preview proxy error");
+      });
+
+      req.pipe(proxyReq);
+    });
+
+    // Forward Hugo's /livereload WebSocket upgrade transparently
+    server.on("upgrade", (req, socket, head) => {
+      const upstream = net.connect(targetPort, "127.0.0.1", () => {
+        let rawReq = `${req.method || "GET"} ${req.url || "/"} HTTP/${req.httpVersion}\r\n`;
+        for (let i = 0; i < req.rawHeaders.length; i += 2) {
+          const key = req.rawHeaders[i];
+          const lower = key.toLowerCase();
+          let val = req.rawHeaders[i + 1];
+          if (lower === "host") {
+            val = `127.0.0.1:${targetPort}`;
+          } else if (lower === "origin") {
+            val = `http://127.0.0.1:${targetPort}`;
+          }
+          rawReq += `${key}: ${val}\r\n`;
+        }
+        rawReq += "\r\n";
+        upstream.write(rawReq);
+        if (head.length > 0) upstream.write(head);
+        upstream.pipe(socket);
+        socket.pipe(upstream);
+      });
+      upstream.on("error", () => socket.destroy());
+      socket.on("error", () => upstream.destroy());
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(listenPort, "127.0.0.1", () => {
+        server.removeListener("error", reject);
+        resolve();
+      });
+    });
+
+    this.proxyServer = server;
+  }
+
+  private closeProxy(): void {
+    if (this.proxyServer) {
+      try {
+        this.proxyServer.close();
+      } catch {
+        // ignore
+      }
+      this.proxyServer = null;
+    }
+  }
+
   async stop(): Promise<HugoStatus> {
+    this.closeProxy();
     const child = this.child;
     if (!child || child.exitCode !== null) {
       this.child = null;

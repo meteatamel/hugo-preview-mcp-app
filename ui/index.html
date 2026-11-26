@@ -11,35 +11,49 @@
     <!-- Top Control Bar -->
     <header class="toolbar">
       <div class="toolbar-row">
-        <button id="btn-start-stop" class="btn btn-primary" type="button">Start</button>
-        <span id="status-badge" class="status-badge stopped" title="Hugo server status">
+        <button id="btn-start-stop" class="btn btn-primary" type="button" title="Start the local Hugo dev server for this site">
+          <svg id="icon-start" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          <svg id="icon-stop" class="hidden" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+          <span id="label-start-stop">Start</span>
+        </button>
+        <span id="status-badge" class="status-badge stopped" title="Current local Hugo server status and port">
           <span class="status-dot"></span>
           <span id="status-label">Connecting...</span>
         </span>
-        <button id="btn-reload" class="btn hidden" type="button" title="Reload preview iframe">↻</button>
 
-        <label class="flag-toggle" title="Include draft posts (--buildDrafts)">
+        <label class="flag-toggle" title="Include draft posts when building (--buildDrafts)">
           <input id="chk-drafts" type="checkbox" checked />
           <span>-D</span>
         </label>
-        <label class="flag-toggle" title="Include future-dated posts (--buildFuture)">
+        <label class="flag-toggle" title="Include future-dated posts when building (--buildFuture)">
           <input id="chk-future" type="checkbox" checked />
           <span>-F</span>
         </label>
 
         <div class="spacer"></div>
 
-        <button id="btn-mobile" class="btn hidden" type="button" title="Toggle mobile width preview">📱</button>
-        <button id="btn-open-browser" class="btn hidden" type="button" title="Open in external browser">↗</button>
-        <button id="btn-logs" class="btn" type="button" title="Toggle build logs">Logs</button>
-        <button id="btn-settings" class="btn" type="button" title="Site & port settings">⚙</button>
+        <button id="btn-mobile" class="btn hidden" type="button" title="Toggle mobile viewport width (390px) to check responsive layout">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          <span>Mobile</span>
+        </button>
+        <button id="btn-open-browser" class="btn hidden" type="button" title="Open the current blog post in your external web browser">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          <span>Open</span>
+        </button>
+        <button id="btn-logs" class="btn" type="button" title="Show or hide live Hugo server build logs and errors">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>Logs</span>
+        </button>
+        <button id="btn-settings" class="btn" type="button" title="Configure the Hugo site directory and local server port">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Settings</span>
+        </button>
       </div>
 
       <!-- Post View Bar (shown when viewing a post) -->
       <div id="running-bar" class="toolbar-row picker-row hidden">
         <button id="btn-back-posts" class="btn" type="button" title="Back to posts list">← Posts</button>
         <select id="post-select" class="post-select" aria-label="Select a blog post"></select>
-        <button id="btn-refresh-posts" class="btn" type="button" title="Refresh post list">⟳</button>
         <div class="segmented" role="group" aria-label="View mode">
           <button id="btn-mode-preview" class="seg-btn active" type="button" title="Live preview only">Preview</button>
           <button id="btn-mode-split" class="seg-btn" type="button" title="Markdown editor + live preview">Split</button>
@@ -73,16 +87,15 @@
       <section id="editor-pane" class="editor-pane hidden">
         <div class="editor-header">
           <span id="editor-filename" class="editor-filename">Select a post to edit</span>
-          <span id="editor-status" class="editor-status"></span>
           <div class="spacer"></div>
-          <label class="flag-toggle" title="Automatically save 1s after you stop typing">
-            <input id="chk-autosave" type="checkbox" checked />
-            <span>Auto-save</span>
-          </label>
-          <button id="btn-save-md" class="btn btn-xs btn-primary" type="button" title="Save Markdown (Cmd/Ctrl+S)" disabled>Save</button>
+          <span id="editor-status" class="editor-status"></span>
         </div>
         <textarea id="md-editor" class="md-editor" spellcheck="true" placeholder="Select a post from the dropdown above to edit its Markdown..."></textarea>
       </section>
+
+      <div id="split-resizer" class="split-resizer hidden" role="separator" aria-orientation="horizontal" title="Drag to resize editor and preview (double-click to reset)">
+        <span class="split-resizer-grip"></span>
+      </div>
 
       <div id="iframe-wrap" class="iframe-wrap hidden">
         <iframe id="preview-iframe" title="Hugo live preview" src="about:blank"></iframe>
